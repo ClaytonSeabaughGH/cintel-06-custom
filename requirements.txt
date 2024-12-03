@@ -1,1 +1,9 @@
-
+shiny
+pandas
+plotly
+shinywidgets
+scipy
+shinyexpress
+shinylive
+Jinja2
+matplotlib

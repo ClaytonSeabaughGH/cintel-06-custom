@@ -1,223 +1,163 @@
-# --------------------------------------------
-# Imports at the top - PyShiny EXPRESS VERSION
-# --------------------------------------------
-
-# From shiny, import just reactive and render
-from shiny import reactive, render
-
-# From shiny.express, import just ui and inputs if needed
-from shiny.express import ui
-
-import random
-from datetime import datetime
-from collections import deque
+import shiny
+from shiny import ui, render, reactive
 import pandas as pd
-import plotly.express as px
-from shinywidgets import render_plotly
-from scipy import stats
+import random
+import matplotlib.pyplot as plt
 
-# --------------------------------------------
-# Import icons as you like
-# --------------------------------------------
+# Fake Data Generation Function (scriptable)
+def generate_fake_data(characters=None, stat_ranges=None, num_characters=100):
+    # Default character classes if none are provided
+    if characters is None:
+        characters = ['Wizard', 'Fighter', 'Rogue', 'Cleric', 'Barbarian']
+    
+    # Default stat ranges if none are provided
+    if stat_ranges is None:
+        stat_ranges = {
+            'Strength': (8, 18),
+            'Dexterity': (8, 18),
+            'Constitution': (8, 18),
+            'Intelligence': (8, 18),
+            'Wisdom': (8, 18),
+            'Charisma': (8, 18),
+        }
 
-# https://fontawesome.com/v4/cheatsheet/
-from faicons import icon_svg
+    stats = {
+        'Character': [random.choice(characters) for _ in range(num_characters)],
+        'Strength': [random.randint(stat_ranges['Strength'][0], stat_ranges['Strength'][1]) for _ in range(num_characters)],
+        'Dexterity': [random.randint(stat_ranges['Dexterity'][0], stat_ranges['Dexterity'][1]) for _ in range(num_characters)],
+        'Constitution': [random.randint(stat_ranges['Constitution'][0], stat_ranges['Constitution'][1]) for _ in range(num_characters)],
+        'Intelligence': [random.randint(stat_ranges['Intelligence'][0], stat_ranges['Intelligence'][1]) for _ in range(num_characters)],
+        'Wisdom': [random.randint(stat_ranges['Wisdom'][0], stat_ranges['Wisdom'][1]) for _ in range(num_characters)],
+        'Charisma': [random.randint(stat_ranges['Charisma'][0], stat_ranges['Charisma'][1]) for _ in range(num_characters)],
+    }
+    return pd.DataFrame(stats)
 
-# --------------------------------------------
-# Shiny EXPRESS VERSION
-# --------------------------------------------
-
-# --------------------------------------------
-# First, set a constant UPDATE INTERVAL for all live data
-# Constants are usually defined in uppercase letters
-# Use a type hint to make it clear that it's an integer (: int)
-# --------------------------------------------
-
-UPDATE_INTERVAL_SECS: int = 3
-
-# --------------------------------------------
-# Initialize a REACTIVE VALUE with a common data structure
-# The reactive value is used to store state (information)
-# Used by all the display components that show this live data.
-# This reactive value is a wrapper around a DEQUE of readings
-# --------------------------------------------
-
-DEQUE_SIZE: int = 5
-reactive_value_wrapper = reactive.value(deque(maxlen=DEQUE_SIZE))
-
-# --------------------------------------------
-# Initialize a REACTIVE CALC that all display components can call
-# to get the latest data and display it.
-# The calculation is invalidated every UPDATE_INTERVAL_SECS
-# to trigger updates.
-# It returns a tuple with everything needed to display the data.
-# Very easy to expand or modify.
-# --------------------------------------------
-
-
-@reactive.calc()
-def reactive_calc_combined():
-    # Invalidate this calculation every UPDATE_INTERVAL_SECS to trigger updates
-    reactive.invalidate_later(UPDATE_INTERVAL_SECS)
-
-    # Data generation logic
-    temp = round(random.uniform(-18, -16), 1)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_dictionary_entry = {"temp":temp, "timestamp":timestamp}
-
-    # get the deque and append the new entry
-    reactive_value_wrapper.get().append(new_dictionary_entry)
-
-    # Get a snapshot of the current deque for any further processing
-    deque_snapshot = reactive_value_wrapper.get()
-
-    # For Display: Convert deque to DataFrame for display
-    df = pd.DataFrame(deque_snapshot)
-
-    # For Display: Get the latest dictionary entry
-    latest_dictionary_entry = new_dictionary_entry
-
-    # Return a tuple with everything we need
-    # Every time we call this function, we'll get all these values
-    return deque_snapshot, df, latest_dictionary_entry
-
-
-# Define the Shiny UI Page layout
-# Call the ui.page_opts() function
-# Set title to a string in quotes that will appear at the top
-# Set fillable to True to use the whole page width for the UI
-ui.page_opts(title="Clayton's PyShiny Express: Live Data", fillable=True)
-
-# Sidebar is typically used for user interaction/information
-# Note the with statement to create the sidebar followed by a colon
-# Everything in the sidebar is indented consistently
-with ui.sidebar(open="open"):
-
-    ui.h2("Antarctic Explorer", class_="text-center")
-    ui.p(
-        "A demonstration of real-time temperature readings in Antarctica.",
-        class_="text-center",
+# Define UI with Shiny Express
+app_ui = ui.page_fluid(
+    ui.layout_sidebar(
+        ui.sidebar(
+            ui.input_slider("strength_range", "Strength Range", min=8, max=18, value=(8, 18)),
+            ui.input_slider("dexterity_range", "Dexterity Range", min=8, max=18, value=(8, 18)),
+            ui.input_slider("constitution_range", "Constitution Range", min=8, max=18, value=(8, 18)),
+        ),
+        ui.layout_columns(
+            ui.h1("Dungeons and Dragons Dashboard"),
+            ui.row(
+                ui.card(
+                    ui.h3("Character Stats Summary"),
+                    ui.output_ui("avg_strength"),
+                    ui.output_ui("avg_dexterity"),
+                    ui.output_ui("avg_constitution"),
+                    ui.output_ui("avg_intelligence"),
+                    ui.output_ui("avg_wisdom"),
+                    ui.output_ui("avg_charisma"),
+                ),
+                ui.card(
+                    ui.h3("Character Distribution"),
+                    ui.output_plot("stats_plot")
+                ),
+            ),
+            ui.row(
+                ui.card(
+                    ui.h3("Character Grid"),
+                    ui.output_table("character_grid"),
+                )
+            ),
+        )
     )
-    ui.hr()
-    ui.h6("Links:")
-    ui.a(
-        "GitHub Source",
-        href="https://github.com/denisecase/cintel-05-cintel",
-        target="_blank",
-    )
-    ui.a(
-        "GitHub App",
-        href="https://denisecase.github.io/cintel-05-cintel/",
-        target="_blank",
-    )
-    ui.a("PyShiny", href="https://shiny.posit.co/py/", target="_blank")
-    ui.a(
-        "PyShiny Express",
-        href="hhttps://shiny.posit.co/blog/posts/shiny-express/",
-        target="_blank",
-    )
+)
 
-# In Shiny Express, everything not in the sidebar is in the main panel
+# Define server function to handle the logic
+def server(input, output, session):
+    # Function to get filtered data based on slider values
+    @reactive.Calc
+    def filtered_data():
+        # Extracting the slider values using .get()
+        strength_range = input.strength_range.get()
+        dexterity_range = input.dexterity_range.get()
+        constitution_range = input.constitution_range.get()
 
-with ui.layout_columns():
-    with ui.value_box(
-        showcase=icon_svg("sun"),
-        theme="bg-gradient-blue-purple",
-    ):
-
-        "Current Temperature"
-
-        @render.text
-        def display_temp():
-            """Get the latest reading and return a temperature string"""
-            deque_snapshot, df, latest_dictionary_entry = reactive_calc_combined()
-            return f"{latest_dictionary_entry['temp']} C"
-
-        "warmer than usual"
-
-  
-
-    with ui.card(full_screen=True):
-        ui.card_header("Current Date and Time")
-
-        @render.text
-        def display_time():
-            """Get the latest reading and return a timestamp string"""
-            deque_snapshot, df, latest_dictionary_entry = reactive_calc_combined()
-            return f"{latest_dictionary_entry['timestamp']}"
-
-
-#with ui.card(full_screen=True, min_height="40%"):
-with ui.card(full_screen=True):
-    ui.card_header("Most Recent Readings")
-
-    @render.data_frame
-    def display_df():
-        """Get the latest reading and return a dataframe with current readings"""
-        deque_snapshot, df, latest_dictionary_entry = reactive_calc_combined()
-        pd.set_option('display.width', None)        # Use maximum width
-        return render.DataGrid( df,width="100%")
-
-# Display temperature alert
-@render.text
-def temperature_alert():
-    _, _, latest_entry = reactive_calc_combined()
-    if latest_entry["temp"] > -16:
-        return "⚠️ Temperature is unusually high!"
-    return "Temperature is within normal range."
-
-with ui.card():
-    ui.card_header("Chart with Current Trend")
-
-    @render_plotly
-    def display_plot():
-        # Fetch from the reactive calc function
-        deque_snapshot, df, latest_dictionary_entry = reactive_calc_combined()
-
-        # Ensure the DataFrame is not empty before plotting
-        if not df.empty:
-            # Convert the 'timestamp' column to datetime for better plotting
-            df["timestamp"] = pd.to_datetime(df["timestamp"])
-
-            # Create scatter plot for readings
-            # pass in the df, the name of the x column, the name of the y column,
-            # and more
+        stat_ranges = {
+            'Strength': strength_range,
+            'Dexterity': dexterity_range,
+            'Constitution': constitution_range,
+            'Intelligence': (8, 18),  # Default range for other stats
+            'Wisdom': (8, 18),
+            'Charisma': (8, 18),
+        }
         
-            fig = px.scatter(df,
-            x="timestamp",
-            y="temp",
-            title="Temperature Readings with Regression Line",
-            labels={"temp": "Temperature (°C)", "timestamp": "Time"},
-            color_discrete_sequence=["blue"] )
-            
-            # Linear regression - we need to get a list of the
-            # Independent variable x values (time) and the
-            # Dependent variable y values (temp)
-            # then, it's pretty easy using scipy.stats.linregress()
+        df = generate_fake_data(stat_ranges=stat_ranges)
+        df = df[
+            (df['Strength'] >= strength_range[0]) & (df['Strength'] <= strength_range[1]) &
+            (df['Dexterity'] >= dexterity_range[0]) & (df['Dexterity'] <= dexterity_range[1]) &
+            (df['Constitution'] >= constitution_range[0]) & (df['Constitution'] <= constitution_range[1])
+        ]
+        return df
 
-            # For x let's generate a sequence of integers from 0 to len(df)
-            sequence = range(len(df))
-            x_vals = list(sequence)
-            y_vals = df["temp"]
+    # Stats summary
+    @output
+    @render.ui
+    def avg_strength():
+        df = filtered_data()
+        avg = df['Strength'].mean()
+        return ui.div(f"Avg Strength: {avg:.2f}", class_="value-box")
 
-            slope, intercept, r_value, p_value, std_err = stats.linregress(x_vals, y_vals)
-            df['best_fit_line'] = [slope * x + intercept for x in x_vals]
+    @output
+    @render.ui
+    def avg_dexterity():
+        df = filtered_data()
+        avg = df['Dexterity'].mean()
+        return ui.div(f"Avg Dexterity: {avg:.2f}", class_="value-box")
 
-            # Add the regression line to the figure
-            fig.add_scatter(x=df["timestamp"], y=df['best_fit_line'], mode='lines', name='Regression Line')
+    @output
+    @render.ui
+    def avg_constitution():
+        df = filtered_data()
+        avg = df['Constitution'].mean()
+        return ui.div(f"Avg Constitution: {avg:.2f}", class_="value-box")
 
-            # Update layout as needed to customize further
-            fig.update_layout(xaxis_title="Time",yaxis_title="Temperature (°C)")
+    @output
+    @render.ui
+    def avg_intelligence():
+        df = filtered_data()
+        avg = df['Intelligence'].mean()
+        return ui.div(f"Avg Intelligence: {avg:.2f}", class_="value-box")
 
-        return fig
+    @output
+    @render.ui
+    def avg_wisdom():
+        df = filtered_data()
+        avg = df['Wisdom'].mean()
+        return ui.div(f"Avg Wisdom: {avg:.2f}", class_="value-box")
 
-# Create statistical summary of temp trends
-with ui.card():
-    ui.card_header("Statistical Summary")
+    @output
+    @render.ui
+    def avg_charisma():
+        df = filtered_data()
+        avg = df['Charisma'].mean()
+        return ui.div(f"Avg Charisma: {avg:.2f}", class_="value-box")
 
-    @render.text
-    def display_statistics():
-        deque_snapshot, df, latest_dictionary_entry = reactive_calc_combined()
-        if not df.empty:
-            stats_summary = df["temp"].describe().to_dict()
-            return f"Min: {stats_summary['min']}°C, Max: {stats_summary['max']}°C, Mean: {stats_summary['mean']:.2f}°C"
+    # Generate a plot of character stats
+    @output
+    @render.plot
+    def stats_plot():
+        df = filtered_data()
+        stats = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+        means = [df[stat].mean() for stat in stats]
+
+        plt.bar(stats, means, color='skyblue')
+        plt.xlabel('Stat')
+        plt.ylabel('Average Value')
+        plt.title('Average Character Stats')
+        return plt.gcf()
+
+    # Display character data grid
+    @output
+    @render.table
+    def character_grid():
+        df = filtered_data()
+        return df[['Character', 'Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']].head(10)
+
+# Run the app
+app = shiny.App(app_ui, server)
+app.run()  # Explicitly start the app
